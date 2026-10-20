@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1A35">
+<meta name="color-scheme" content="dark">
+<title>Cielo</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root {
+  --notte: #0E1A35;
+  --volta: #15264F;
+  --avorio: #F1E9D2;
+  --nebbia: #98A3C2;
+  --ottone: #CDA85F;
+  --filo: rgba(205, 168, 95, .28);
+  --serif: "Palatino Linotype", "Book Antiqua", Palatino, "Noto Serif", "Droid Serif", Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { margin: 0; background: var(--notte); color: var(--avorio); font-family: var(--sans); }
+body { min-height: 100vh; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--ottone); outline-offset: 2px; }
+
+.app { max-width: 1180px; margin: 0 auto; padding: 14px 16px 28px; display: grid; gap: 14px; }
+@media (min-width: 900px) {
+  .app { grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr); align-items: start; padding-top: 22px; }
+  header { grid-column: 1 / -1; }
+}
+
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--serif); font-weight: 400; font-size: 2.1rem; letter-spacing: .02em; margin: 0; line-height: 1; }
+.luogo { background: none; border: 0; padding: 4px 0; color: var(--nebbia); text-align: right; font-size: .95rem; }
+.luogo strong { color: var(--avorio); font-weight: 600; }
+
+.cupola-box { position: relative; }
+#mappa { width: 100%; aspect-ratio: 1; display: block; touch-action: manipulation; }
+.stato { font-family: var(--serif); font-size: 1.05rem; color: var(--nebbia); margin: 4px 0 0; text-align: center; }
+.stato b { color: var(--avorio); font-weight: 400; }
+
+.tempo { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; margin-top: 6px; }
+.tempo input[type=range] { width: 100%; accent-color: var(--ottone); }
+.ora { font-variant-numeric: tabular-nums; font-family: var(--serif); font-size: 1.35rem; min-width: 5.2ch; text-align: center; }
+.pill { border: 1px solid var(--filo); background: transparent; border-radius: 999px; padding: 8px 14px; font-size: .92rem; }
+.pill.attivo { border-color: var(--ottone); color: var(--ottone); }
+.riga-azioni { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+.punta { background: var(--ottone); color: #1A1406; border: 0; border-radius: 999px; padding: 12px 22px; font-weight: 600; font-size: 1rem; }
+
+.lista { list-style: none; margin: 0; padding: 0; }
+.lista li { display: grid; grid-template-columns: 22px 1fr auto; gap: 4px 12px; align-items: center; padding: 12px 6px; border-bottom: 1px solid var(--filo); cursor: pointer; border-radius: 6px; }
+.lista li.sel { background: rgba(205, 168, 95, .1); }
+.lista li.sotto { opacity: .55; }
+.pallino { width: 14px; height: 14px; border-radius: 50%; justify-self: center; }
+.nome { font-family: var(--serif); font-size: 1.2rem; }
+.dove { color: var(--nebbia); font-size: .9rem; grid-column: 2; }
+.vis { grid-column: 3; grid-row: 1 / span 2; text-align: right; font-size: .85rem; color: var(--nebbia); max-width: 12ch; }
+.vis.si { color: var(--ottone); }
+.pannello h2 { font-family: var(--serif); font-weight: 400; font-size: 1.25rem; margin: 6px 0 4px; }
+.nota { color: var(--nebbia); font-size: .85rem; line-height: 1.5; margin: 14px 4px 0; }
+
+dialog { background: var(--volta); color: var(--avorio); border: 1px solid var(--filo); border-radius: 14px; width: min(420px, 92vw); padding: 20px; }
+dialog::backdrop { background: rgba(5, 10, 25, .7); }
+dialog h2 { font-family: var(--serif); font-weight: 400; margin: 0 0 12px; }
+dialog label { display: block; font-size: .88rem; color: var(--nebbia); margin: 10px 0 4px; }
+dialog input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--filo); background: var(--notte); color: var(--avorio); font: inherit; }
+.due { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fila { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; justify-content: flex-end; }
+.msg { color: var(--ottone); font-size: .88rem; min-height: 1.2em; margin-top: 8px; }
+
+/* Modalità "punta il telefono" */
+#ar { position: fixed; inset: 0; z-index: 20; background: #050A18; display: none; }
+#ar.aperto { display: block; }
+#video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .55; }
+#arcanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ar-top { position: absolute; top: 0; left: 0; right: 0; padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; background: linear-gradient(rgba(5,10,24,.85), rgba(5,10,24,0)); }
+.ar-bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 14px calc(env(safe-area-inset-bottom, 0px) + 14px); background: linear-gradient(rgba(5,10,24,0), rgba(5,10,24,.9)); text-align: center; }
+.guida { font-family: var(--serif); font-size: 1.3rem; min-height: 1.6em; }
+.mira { font-variant-numeric: tabular-nums; color: var(--nebbia); font-size: .9rem; margin-top: 4px; }
+.scelte { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 2px; scrollbar-width: none; }
+.scelte button { flex: none; }
+
+.spunta { display: flex !important; gap: 10px; align-items: center; color: var(--avorio) !important; margin-top: 14px !important; }
+.spunta input { width: 20px; height: 20px; accent-color: var(--ottone); }
+.ar-dx { display: flex; gap: 6px; align-items: center; }
+.qualita { font-size: .82rem; color: var(--nebbia); text-align: center; margin-top: 2px; }
+.qualita b { font-weight: 600; }
+.foglio { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; background: var(--volta); border-top: 1px solid var(--filo); border-radius: 18px 18px 0 0;
+  padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 18px); max-height: 78vh; overflow-y: auto; display: none; }
+.foglio.aperto { display: block; }
+.foglio h3 { font-family: var(--serif); font-weight: 400; font-size: 1.3rem; margin: 0 0 6px; }
+.foglio p { color: var(--nebbia); font-size: .9rem; line-height: 1.5; margin: 4px 0 12px; }
+.blocco { border-top: 1px solid var(--filo); padding: 14px 0; }
+.blocco:first-of-type { border-top: 0; padding-top: 4px; }
+.regola { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center; margin: 6px 0; font-size: .92rem; }
+.regola span.val { min-width: 4.5ch; text-align: center; font-variant-numeric: tabular-nums; color: var(--ottone); }
+#otto { position: absolute; inset: 0; z-index: 4; background: rgba(8,14,32,.94); display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+#otto.aperto { display: flex; }
+#ottoCanvas { width: min(80vw, 340px); height: min(48vw, 200px); }
+.barra { width: min(80vw, 320px); height: 8px; border-radius: 4px; background: var(--filo); overflow: hidden; margin: 14px 0 6px; }
+.barra i { display: block; height: 100%; width: 0; background: var(--ottone); }
+#allinea { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(70px); z-index: 2; text-align: center; display: none; padding: 0 16px; }
+#allinea.aperto { display: block; }
+#allinea .testo { font-family: var(--serif); font-size: 1.15rem; text-shadow: 0 1px 4px #000; margin-bottom: 10px; }
+.btn-ottone { background: var(--ottone); color: #1A1406; border: 0; border-radius: 999px; padding: 12px 22px; font-weight: 600; }
+
+/* Visione notturna: tutto in rosso per non perdere l'adattamento al buio */
+#rosso { position: fixed; inset: 0; background: #FF2A1A; mix-blend-mode: multiply; pointer-events: none; z-index: 50; display: none; }
+body.notturna #rosso { display: block; }
+body.notturna #video { filter: grayscale(1) brightness(.6); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="rosso"></div>
+<div class="app">
+  <header>
+    <h1>Cielo</h1>
+    <button class="luogo" id="btnLuogo" aria-label="Cambia luogo"><strong id="nomeLuogo">Grancia</strong><br><span id="coord"></span></button>
+  </header>
+
+  <section class="cupola-box">
+    <canvas id="mappa" aria-label="Mappa del cielo"></canvas>
+    <p class="stato" id="stato"></p>
+    <div class="tempo">
+      <button class="pill" id="meno" aria-label="Un'ora prima">−1 h</button>
+      <input type="range" id="slider" min="-1440" max="1440" step="10" value="0" aria-label="Sposta l'ora">
+      <button class="pill" id="piu" aria-label="Un'ora dopo">+1 h</button>
+    </div>
+    <div class="riga-azioni">
+      <span class="ora" id="ora">--:--</span>
+      <button class="pill attivo" id="adesso">Adesso</button>
+      <button class="pill" id="data">Cambia data</button>
+      <button class="pill" id="notturna">Visione notturna</button>
+    </div>
+    <div class="riga-azioni" id="rigaPunta" hidden>
+      <button class="punta" id="apriAR">Punta il telefono al cielo</button>
+    </div>
+  </section>
+
+  <section class="pannello">
+    <h2 id="titoloLista">Pianeti adesso</h2>
+    <ul class="lista" id="lista"></ul>
+    <p class="nota">Tocca un pianeta per evidenziarlo sulla mappa. La mappa è il cielo visto da sdraiati con la testa a Nord: il centro è sopra di te, il bordo è l'orizzonte, l'Est sta a sinistra. La linea tratteggiata è l'eclittica, la strada che seguono Sole, Luna e pianeti.</p>
+  </section>
+</div>
+
+<dialog id="dlgLuogo">
+  <h2>Luogo di osservazione</h2>
+  <button class="pill" id="gps">Usa la posizione del telefono</button>
+  <label for="inNome">Nome</label>
+  <input id="inNome" autocomplete="off">
+  <div class="due">
+    <div><label for="inLat">Latitudine</label><input id="inLat" inputmode="decimal"></div>
+    <div><label for="inLon">Longitudine</label><input id="inLon" inputmode="decimal"></div>
+  </div>
+  <label class="spunta"><input type="checkbox" id="inAutoGps"> Usa sempre la posizione del telefono (GPS)</label>
+  <div class="msg" id="msgLuogo"></div>
+  <div class="fila">
+    <button class="pill" id="annullaLuogo">Annulla</button>
+    <button class="pill attivo" id="salvaLuogo">Salva luogo</button>
+  </div>
+</dialog>
+
+<dialog id="dlgData">
+  <h2>Scegli data e ora</h2>
+  <label for="inData">Data e ora</label>
+  <input type="datetime-local" id="inData">
+  <div class="fila">
+    <button class="pill" id="annullaData">Annulla</button>
+    <button class="pill attivo" id="salvaData">Mostra il cielo</button>
+  </div>
+</dialog>
+
+<div id="ar" aria-label="Modalità punta il telefono">
+  <video id="video" playsinline muted autoplay></video>
+  <canvas id="arcanvas"></canvas>
+  <div class="ar-top">
+    <button class="pill" id="chiudiAR">Chiudi</button>
+    <div class="ar-dx">
+      <button class="pill" id="camera">Camera</button>
+      <button class="pill" id="apriCal">Calibra</button>
+    </div>
+  </div>
+  <div id="allinea">
+    <div class="testo" id="allineaTesto"></div>
+    <button class="btn-ottone" id="allineaOk">È al centro</button>
+    <button class="pill" id="allineaNo" style="margin-left:6px">Annulla</button>
+  </div>
+  <div class="ar-bottom">
+    <div class="guida" id="guida">Inquadra il cielo</div>
+    <div class="mira" id="mira"></div>
+    <div class="qualita" id="qualita"></div>
+    <div class="scelte" id="scelte"></div>
+  </div>
+
+  <div class="foglio" id="foglio">
+    <div class="blocco">
+      <h3>1 · Bussola</h3>
+      <p>Allontanati da auto, ringhiere e oggetti metallici, poi muovi il telefono disegnando un 8 in aria per qualche secondo.</p>
+      <button class="pill attivo" id="avviaOtto">Calibra la bussola</button>
+    </div>
+    <div class="blocco">
+      <h3>2 · Allinea su un astro</h3>
+      <p>Il metodo più preciso. Scegli un oggetto che vedi davvero, accendi la camera e centralo nel mirino.</p>
+      <div class="scelte" id="sceltiAllinea"></div>
+    </div>
+    <div class="blocco">
+      <h3>Regolazione fine</h3>
+      <div class="regola"><span>Sinistra / destra</span><button class="pill" id="azMeno">◀</button><span class="val" id="valAz"></span><button class="pill" id="azPiu">▶</button></div>
+      <div class="regola"><span>Basso / alto</span><button class="pill" id="altMeno">▼</button><span class="val" id="valAlt"></span><button class="pill" id="altPiu">▲</button></div>
+      <p id="fonteLuogo" style="margin-top:10px"></p>
+      <div class="fila" style="justify-content:space-between">
+        <button class="pill" id="azzera">Azzera calibrazione</button>
+        <button class="pill attivo" id="chiudiFoglio">Fatto</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="otto">
+    <canvas id="ottoCanvas"></canvas>
+    <h3 style="font-family:var(--serif);font-weight:400;font-size:1.4rem;margin:16px 0 4px" id="ottoTitolo">Disegna un 8 in aria</h3>
+    <p style="color:var(--nebbia);max-width:30ch;margin:0" id="ottoTesto">Ruota anche il polso, inclinando il telefono in avanti, indietro e di lato.</p>
+    <div class="barra"><i id="ottoBarra"></i></div>
+    <button class="pill" id="ottoStop" style="margin-top:12px">Interrompi</button>
+  </div>
+</div>
+
+<script>
+/* ===== Motore astronomico di "Cielo" =====
+   Pianeti: elementi orbitali approssimati JPL (Standish), validi 1800-2050.
+   Luna: serie ridotta dell'Astronomical Almanac con parallasse topocentrica.
+   Precisione: pianeti entro pochi primi d'arco, Luna entro ~0,3 gradi. */
+const Astro = (() => {
+  const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+  const sin = x => Math.sin(x * D2R), cos = x => Math.cos(x * D2R);
+  const norm360 = x => ((x % 360) + 360) % 360;
+
+  // a, e, I, L, perielio (varpi), nodo (Omega) e loro variazioni per secolo
+  const EL = {
+    mercury: [[0.38709927, 0.20563593, 7.00497902, 252.25032350, 77.45779628, 48.33076593],
+              [0.00000037, 0.00001906, -0.00594749, 149472.67411175, 0.16047689, -0.12534081]],
+    venus:   [[0.72333566, 0.00677672, 3.39467605, 181.97909950, 131.60246718, 76.67984255],
+              [0.00000390, -0.00004107, -0.00078890, 58517.81538729, 0.00268329, -0.27769418]],
+    earth:   [[1.00000261, 0.01671123, -0.00001531, 100.46457166, 102.93768193, 0.0],
+              [0.00000562, -0.00004392, -0.01294668, 35999.37244981, 0.32327364, 0.0]],
+    mars:    [[1.52371034, 0.09339410, 1.84969142, -4.55343205, -23.94362959, 49.55953891],
+              [0.00001847, 0.00007882, -0.00813131, 19140.30268499, 0.44441088, -0.29257343]],
+    jupiter: [[5.20288700, 0.04838624, 1.30439695, 34.39644051, 14.72847983, 100.47390909],
+              [-0.00011607, -0.00013253, -0.00183714, 3034.74612775, 0.21252668, 0.20469106]],
+    saturn:  [[9.53667594, 0.05386179, 2.48599187, 49.95424423, 92.59887831, 113.66242448],
+              [-0.00125060, -0.00050991, 0.00193609, 1222.49362201, -0.41897216, -0.28867794]],
+    uranus:  [[19.18916464, 0.04725744, 0.77263783, 313.23810451, 170.95427630, 74.01692503],
+              [-0.00196176, -0.00004397, -0.00242939, 428.48202785, 0.40805281, 0.04240589]],
+    neptune: [[30.06992276, 0.00859048, 1.77004347, -55.12002969, 44.96476227, 131.78422574],
+              [0.00026291, 0.00005105, 0.00035372, 218.45945325, -0.32241464, -0.00508664]]
+  };
+
+  const BODIES = [
+    { id: 'sun', name: 'Sole', color: '#FFC94D', size: 9 },
+    { id: 'moon', name: 'Luna', color: '#ECE8DA', size: 9 },
+    { id: 'mercury', name: 'Mercurio', color: '#BDB6A8', size: 4 },
+    { id: 'venus', name: 'Venere', color: '#FFF3B8', size: 6.5 },
+    { id: 'mars', name: 'Marte', color: '#EE6A43', size: 5 },
+    { id: 'jupiter', name: 'Giove', color: '#F0D2A2', size: 6 },
+    { id: 'saturn', name: 'Saturno', color: '#E2C77C', size: 5.5 },
+    { id: 'uranus', name: 'Urano', color: '#9FE3DF', size: 3.5 },
+    { id: 'neptune', name: 'Nettuno', color: '#7D98FF', size: 3.5 }
+  ];
+
+  // Stelle luminose: [nome, AR ore J2000, Dec gradi J2000, magnitudine]
+  const STARS = [
+    ['Sirio', 6.7525, -16.716, -1.46], ['Arturo', 14.2610, 19.182, -0.05], ['Vega', 18.6156, 38.784, 0.03],
+    ['Capella', 5.2782, 45.998, 0.08], ['Rigel', 5.2423, -8.202, 0.13], ['Procione', 7.6550, 5.225, 0.34],
+    ['Betelgeuse', 5.9195, 7.407, 0.5], ['Altair', 19.8464, 8.868, 0.77], ['Aldebaran', 4.5987, 16.509, 0.85],
+    ['Antares', 16.4901, -26.432, 1.09], ['Spica', 13.4199, -11.161, 0.98], ['Polluce', 7.7553, 28.026, 1.14],
+    ['Fomalhaut', 22.9608, -29.622, 1.16], ['Deneb', 20.6905, 45.280, 1.25], ['Regolo', 10.1395, 11.967, 1.35],
+    ['Castore', 7.5767, 31.888, 1.58], ['Bellatrix', 5.4189, 6.350, 1.64], ['Elnath', 5.4382, 28.608, 1.65],
+    ['Alnilam', 5.6036, -1.202, 1.69], ['Alnitak', 5.6793, -1.943, 1.77], ['Mintaka', 5.5334, -0.299, 2.23],
+    ['Saiph', 5.7959, -9.670, 2.06], ['Alioth', 12.9005, 55.960, 1.77], ['Dubhe', 11.0621, 61.751, 1.79],
+    ['Merak', 11.0307, 56.382, 2.37], ['Phecda', 11.8972, 53.695, 2.44], ['Megrez', 12.2571, 57.033, 3.31],
+    ['Mizar', 13.3988, 54.925, 2.23], ['Alkaid', 13.7923, 49.313, 1.86], ['Stella Polare', 2.5303, 89.264, 1.98],
+    ['Schedar', 0.6751, 56.537, 2.24], ['Caph', 0.1530, 59.150, 2.27], ['Navi', 0.9451, 60.717, 2.47],
+    ['Ruchbah', 1.4303, 60.235, 2.68], ['Segin', 1.9066, 63.670, 3.37], ['Sadr', 20.3705, 40.257, 2.23],
+    ['Gienah', 20.7702, 33.970, 2.48], ['Albireo', 19.5120, 27.960, 3.08], ['Fawaris', 19.7496, 45.131, 2.87],
+    ['Denebola', 11.8177, 14.572, 2.14], ['Algieba', 10.3329, 19.842, 2.01], ['Zosma', 11.2351, 20.524, 2.56],
+    ['Shaula', 17.5601, -37.104, 1.62], ['Dschubba', 16.0056, -22.622, 2.29], ['Acrab', 16.0906, -19.806, 2.62],
+    ['Larawag', 16.8361, -34.293, 2.29], ['Algol', 3.1361, 40.956, 2.1], ['Mirfak', 3.4054, 49.861, 1.79],
+    ['Hamal', 2.1196, 23.463, 2.0], ['Alpheratz', 0.1398, 29.091, 2.06], ['Markab', 23.0793, 15.205, 2.49],
+    ['Scheat', 23.0629, 28.083, 2.42], ['Algenib', 0.2206, 15.184, 2.83], ['Pleiadi', 3.7914, 24.105, 1.6],
+    ['Rasalhague', 17.5822, 12.560, 2.08], ['Kochab', 14.8451, 74.156, 2.08]
+  ];
+
+  // Linee delle costellazioni (indici per nome stella)
+  const LINES = [
+    ['Dubhe', 'Merak'], ['Merak', 'Phecda'], ['Phecda', 'Megrez'], ['Megrez', 'Dubhe'],
+    ['Megrez', 'Alioth'], ['Alioth', 'Mizar'], ['Mizar', 'Alkaid'],
+    ['Betelgeuse', 'Bellatrix'], ['Bellatrix', 'Mintaka'], ['Betelgeuse', 'Alnitak'],
+    ['Mintaka', 'Alnilam'], ['Alnilam', 'Alnitak'], ['Alnitak', 'Saiph'], ['Mintaka', 'Rigel'], ['Saiph', 'Rigel'],
+    ['Caph', 'Schedar'], ['Schedar', 'Navi'], ['Navi', 'Ruchbah'], ['Ruchbah', 'Segin'],
+    ['Deneb', 'Sadr'], ['Sadr', 'Albireo'], ['Fawaris', 'Sadr'], ['Sadr', 'Gienah'],
+    ['Alpheratz', 'Scheat'], ['Scheat', 'Markab'], ['Markab', 'Algenib'], ['Algenib', 'Alpheratz'],
+    ['Regolo', 'Algieba'], ['Algieba', 'Zosma'], ['Zosma', 'Denebola'], ['Regolo', 'Denebola'],
+    ['Castore', 'Polluce'], ['Acrab', 'Dschubba'], ['Dschubba', 'Antares'], ['Antares', 'Larawag'], ['Larawag', 'Shaula'],
+    ['Kochab', 'Stella Polare']
+  ];
+
+  const jd = date => date.getTime() / 86400000 + 2440587.5;
+  const centuries = j => (j - 2451545.0) / 36525;
+
+  function kepler(M, e) {
+    let Mr = M * D2R, E = Mr + e * Math.sin(Mr);
+    for (let i = 0; i < 12; i++) {
+      const d = (E - e * Math.sin(E) - Mr) / (1 - e * Math.cos(E));
+      E -= d; if (Math.abs(d) < 1e-12) break;
+    }
+    return E;
+  }
+
+  // Posizione eliocentrica eclittica J2000 [x,y,z] in UA
+  function helio(id, T) {
+    const [b, r] = EL[id];
+    const a = b[0] + r[0] * T, e = b[1] + r[1] * T, I = b[2] + r[2] * T;
+    const L = b[3] + r[3] * T, w = b[4] + r[4] * T, O = b[5] + r[5] * T;
+    const om = w - O, M = norm360(L - w);
+    const E = kepler(M, e);
+    const xp = a * (Math.cos(E) - e), yp = a * Math.sqrt(1 - e * e) * Math.sin(E);
+    const co = cos(om), so = sin(om), cO = cos(O), sO = sin(O), cI = cos(I), sI = sin(I);
+    return [
+      (co * cO - so * sO * cI) * xp + (-so * cO - co * sO * cI) * yp,
+      (co * sO + so * cO * cI) * xp + (-so * sO + co * cO * cI) * yp,
+      (so * sI) * xp + (co * sI) * yp
+    ];
+  }
+
+  // Eclittica -> equatoriale (obliquità in gradi)
+  function eclToEq(v, eps) {
+    const ce = cos(eps), se = sin(eps);
+    return [v[0], v[1] * ce - v[2] * se, v[1] * se + v[2] * ce];
+  }
+
+  function vecToRaDec(v) {
+    const r = Math.hypot(v[0], v[1], v[2]);
+    return { ra: norm360(Math.atan2(v[1], v[0]) * R2D), dec: Math.asin(v[2] / r) * R2D, r };
+  }
+
+  // Precessione da J2000 alla data (ra, dec in gradi)
+  function precess(ra, dec, T) {
+    const as = 1 / 3600;
+    const zeta = (2306.2181 * T + 0.30188 * T * T) * as;
+    const z = (2306.2181 * T + 1.09468 * T * T) * as;
+    const th = (2004.3109 * T - 0.42665 * T * T) * as;
+    const A = cos(dec) * sin(ra + zeta);
+    const B = cos(th) * cos(dec) * cos(ra + zeta) - sin(th) * sin(dec);
+    const C = sin(th) * cos(dec) * cos(ra + zeta) + cos(th) * sin(dec);
+    return { ra: norm360(Math.atan2(A, B) * R2D + z), dec: Math.asin(C) * R2D };
+  }
+
+  function gmst(j) {
+    const T = centuries(j);
+    return norm360(280.46061837 + 360.98564736629 * (j - 2451545) + 0.000387933 * T * T);
+  }
+
+  function refraction(alt) {
+    if (alt < -1.5) return 0;
+    const a = Math.max(alt, -1.5);
+    return 1.02 / Math.tan((a + 10.3 / (a + 5.11)) * D2R) / 60;
+  }
+
+  // Altezza e azimut (da Nord in senso orario), con rifrazione
+  function horizontal(ra, dec, lat, lon, j) {
+    const H = norm360(gmst(j) + lon - ra);
+    const sa = sin(lat) * sin(dec) + cos(lat) * cos(dec) * cos(H);
+    const alt = Math.asin(Math.max(-1, Math.min(1, sa))) * R2D;
+    const az = norm360(Math.atan2(-cos(dec) * sin(H), sin(dec) * cos(lat) - cos(dec) * sin(lat) * cos(H)) * R2D);
+    return { alt, az };
+  }
+
+  function moonGeo(T) {
+    const lam = 218.32 + 481267.881 * T
+      + 6.29 * sin(135.0 + 477198.87 * T) - 1.27 * sin(259.3 - 413335.36 * T)
+      + 0.66 * sin(235.7 + 890534.22 * T) + 0.21 * sin(269.9 + 954397.74 * T)
+      - 0.19 * sin(357.5 + 35999.05 * T) - 0.11 * sin(186.5 + 966404.03 * T);
+    const bet = 5.13 * sin(93.3 + 483202.02 * T) + 0.28 * sin(228.2 + 960400.89 * T)
+      - 0.28 * sin(318.3 + 6003.15 * T) - 0.17 * sin(217.6 - 407332.21 * T);
+    const par = 0.9508 + 0.0518 * cos(135.0 + 477198.87 * T) + 0.0095 * cos(259.3 - 413335.36 * T)
+      + 0.0078 * cos(235.7 + 890534.22 * T) + 0.0028 * cos(269.9 + 954397.74 * T);
+    return { lam: norm360(lam), bet, par };
+  }
+
+  const MAG = {
+    mercury: i => -0.613 + 6.328e-2 * i - 1.6336e-3 * i ** 2 + 3.3644e-5 * i ** 3 - 3.4265e-7 * i ** 4 + 1.6893e-9 * i ** 5 - 3.0334e-12 * i ** 6,
+    venus: i => -4.384 - 1.044e-3 * i + 3.687e-4 * i ** 2 - 2.814e-6 * i ** 3 + 8.938e-9 * i ** 4,
+    mars: i => -1.52 + 0.016 * i,
+    jupiter: i => -9.25 + 0.005 * i,
+    saturn: i => -9.15 + 0.044 * i,
+    uranus: i => -7.19,
+    neptune: i => -6.87
+  };
+
+  // Coordinate equatoriali (della data) di un corpo; usato anche per alba/tramonto
+  function equatorial(id, j) {
+    const T = centuries(j), eps0 = 23.43928;
+    const E = helio('earth', T);
+    if (id === 'moon') {
+      const m = moonGeo(T), epsD = 23.439291 - 0.0130042 * T;
+      const v = eclToEq([cos(m.bet) * cos(m.lam), cos(m.bet) * sin(m.lam), sin(m.bet)], epsD);
+      const rd = vecToRaDec(v);
+      return { ra: rd.ra, dec: rd.dec, par: m.par, distKm: 6378.14 / Math.sin(m.par * D2R), lam: m.lam };
+    }
+    let g, r = 0;
+    if (id === 'sun') g = [-E[0], -E[1], -E[2]];
+    else { const P = helio(id, T); g = [P[0] - E[0], P[1] - E[1], P[2] - E[2]]; r = Math.hypot(...P); }
+    const rd = vecToRaDec(eclToEq(g, eps0));
+    const p = precess(rd.ra, rd.dec, T);
+    const lam = norm360(Math.atan2(g[1], g[0]) * R2D);
+    return { ra: p.ra, dec: p.dec, dist: rd.r, r, R: Math.hypot(...E), lam };
+  }
+
+  function topoAlt(id, eq, h) {
+    if (id === 'moon') h.alt -= R2D * Math.asin(Math.sin(eq.par * D2R) * Math.cos(h.alt * D2R));
+    return h.alt;
+  }
+
+  function position(id, lat, lon, j) {
+    const eq = equatorial(id, j);
+    const h = horizontal(eq.ra, eq.dec, lat, lon, j);
+    topoAlt(id, eq, h);
+    h.alt += refraction(h.alt);
+    return { ...eq, alt: h.alt, az: h.az };
+  }
+
+  function angSep(ra1, d1, ra2, d2) {
+    const c = sin(d1) * sin(d2) + cos(d1) * cos(d2) * cos(ra1 - ra2);
+    return Math.acos(Math.max(-1, Math.min(1, c))) * R2D;
+  }
+
+  // Calcolo completo per un istante
+  function compute(date, lat, lon) {
+    const j = jd(date);
+    const T = centuries(j);
+    const sun = position('sun', lat, lon, j);
+    const out = BODIES.map(b => {
+      const p = position(b.id, lat, lon, j);
+      const o = { ...b, ...p };
+      o.elong = b.id === 'sun' ? 0 : angSep(p.ra, p.dec, sun.ra, sun.dec);
+      if (b.id === 'moon') {
+        o.illum = (1 - cos(o.elong)) / 2;
+        o.waxing = norm360(p.lam - sun.lam) < 180;
+        const ph = 180 - o.elong; o.mag = -12.73 + 0.026 * ph + 4e-9 * ph ** 4;
+      } else if (b.id === 'sun') {
+        o.mag = -26.7;
+      } else {
+        const cosi = (p.r * p.r + p.dist * p.dist - p.R * p.R) / (2 * p.r * p.dist);
+        const i = Math.acos(Math.max(-1, Math.min(1, cosi))) * R2D;
+        o.phaseAngle = i;
+        o.mag = MAG[b.id](i) + 5 * Math.log10(p.r * p.dist);
+      }
+      return o;
+    });
+    const stars = STARS.map(s => {
+      const p = precess(s[1] * 15, s[2], T);
+      const h = horizontal(p.ra, p.dec, lat, lon, j);
+      h.alt += refraction(h.alt);
+      return { name: s[0], mag: s[3], alt: h.alt, az: h.az };
+    });
+    return { bodies: out, stars, sunAlt: sun.alt, jd: j };
+  }
+
+  // Prossimo sorgere e prossimo tramonto nelle 24 ore dopo "date"
+  function riseSet(id, date, lat, lon) {
+    const j0 = jd(date), step = 10 / 1440, n = 145;
+    const h0 = id === 'sun' ? -0.833 : (id === 'moon' ? 0.125 : -0.567);
+    const altAt = j => {
+      const eq = equatorial(id, j);
+      const h = horizontal(eq.ra, eq.dec, lat, lon, j);
+      return topoAlt(id, eq, h);
+    };
+    let rise = null, set = null, transit = null, maxAlt = -99, prev = altAt(j0) - h0;
+    for (let k = 1; k <= n; k++) {
+      const j = j0 + k * step, cur = altAt(j) - h0;
+      if (cur + h0 > maxAlt) { maxAlt = cur + h0; transit = j; }
+      if (prev < 0 && cur >= 0 || prev >= 0 && cur < 0) {
+        let a = j - step, b = j, fa = prev;
+        for (let it = 0; it < 20; it++) {
+          const m = (a + b) / 2, fm = altAt(m) - h0;
+          if ((fa < 0) === (fm < 0)) { a = m; fa = fm; } else b = m;
+        }
+        const t = new Date(((a + b) / 2 - 2440587.5) * 86400000);
+        if (prev < 0) { if (!rise) rise = t; } else { if (!set) set = t; }
+      }
+      prev = cur;
+    }
+    const toDate = j => new Date((j - 2440587.5) * 86400000);
+    return {
+      rise, set, transit: transit ? toDate(transit) : null, maxAlt,
+      always: !rise && !set && maxAlt > h0, never: !rise && !set && maxAlt <= h0
+    };
+  }
+
+  const DIRS = ['Nord', 'Nord-Est', 'Est', 'Sud-Est', 'Sud', 'Sud-Ovest', 'Ovest', 'Nord-Ovest'];
+  const direction = az => DIRS[Math.round(norm360(az) / 45) % 8];
+
+  function moonPhaseName(illum, waxing) {
+    if (illum < 0.03) return 'Luna nuova';
+    if (illum > 0.97) return 'Luna piena';
+    if (illum > 0.45 && illum < 0.55) return waxing ? 'Primo quarto' : 'Ultimo quarto';
+    if (illum < 0.5) return waxing ? 'Falce crescente' : 'Falce calante';
+    return waxing ? 'Gibbosa crescente' : 'Gibbosa calante';
+  }
+
+  function skyState(sunAlt) {
+    if (sunAlt > -0.833) return 'Giorno';
+    if (sunAlt > -6) return 'Crepuscolo civile';
+    if (sunAlt > -12) return 'Crepuscolo nautico';
+    if (sunAlt > -18) return 'Crepuscolo astronomico';
+    return 'Notte piena';
+  }
+
+  // Punti dell'eclittica (la "strada" dei pianeti) in altezza/azimut
+  function ecliptic(lat, lon, j) {
+    const T = centuries(j), eps = 23.439291 - 0.0130042 * T, pts = [];
+    for (let L = 0; L <= 360; L += 4) {
+      const rd = vecToRaDec(eclToEq([cos(L), sin(L), 0], eps));
+      pts.push(horizontal(rd.ra, rd.dec, lat, lon, j));
+    }
+    return pts;
+  }
+
+  return { BODIES, STARS, LINES, compute, ecliptic, riseSet, direction, moonPhaseName, skyState, jd, position };
+})();
+
+</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const D2R = Math.PI / 180;
+  const pad = n => String(n).padStart(2, '0');
+  const hm = d => d ? pad(d.getHours()) + ':' + pad(d.getMinutes()) : '--:--';
+
+  // ---------- Stato ----------
+  const salvato = k => { try { return JSON.parse(localStorage.getItem('cielo.' + k)); } catch (e) { return null; } };
+  const salva = (k, v) => { try { localStorage.setItem('cielo.' + k, JSON.stringify(v)); } catch (e) {} };
+
+  const S = {
+    luogo: salvato('luogo') || { nome: 'Grancia', lat: 45.968, lon: 8.927 },
+    base: null,          // null = tempo reale
+    offset: 0,           // minuti dallo slider
+    scelto: salvato('scelto') || 'jupiter',
+    notturna: !!salvato('notturna'),
+    correzione: salvato('correzione') ?? 3,   // gradi in azimut (declinazione + errore bussola)
+    corrAlt: salvato('corrAlt') ?? 0,         // gradi in altezza (errore del giroscopio)
+    autoGps: !!salvato('autoGps'),
+    gps: null,                                // {lat, lon, acc} dal telefono
+    dati: null, alba: {}, giornoAlba: '',
+    hit: []
+  };
+
+  // Luogo usato per i calcoli: GPS se attivo, altrimenti quello salvato
+  const usaGps = () => S.gps && (S.autoGps || arAttivo);
+  const pos = () => usaGps() ? { nome: 'Posizione GPS', lat: S.gps.lat, lon: S.gps.lon } : S.luogo;
+  const ora = () => new Date((S.base ? S.base.getTime() : Date.now()) + S.offset * 60000);
+
+  // ---------- Calcolo ----------
+  function aggiorna() {
+    const t = ora();
+    const L = pos();
+    S.dati = Astro.compute(t, L.lat, L.lon);
+    S.ecl = Astro.ecliptic(L.lat, L.lon, S.dati.jd);
+    Astro.BODIES.forEach(b => { S.alba[b.id] = Astro.riseSet(b.id, t, L.lat, L.lon); });
+    mostraLuogo();
+    disegnaMappa();
+    disegnaLista();
+    const luna = S.dati.bodies.find(b => b.id === 'moon');
+    $('stato').innerHTML = '<b>' + Astro.skyState(S.dati.sunAlt) + '</b> · ' +
+      Astro.moonPhaseName(luna.illum, luna.waxing) + ' ' + Math.round(luna.illum * 100) + '%';
+    $('ora').textContent = hm(t);
+    const oggi = new Date().toDateString() === t.toDateString();
+    $('titoloLista').textContent = (S.base || S.offset) ?
+      'Pianeti ' + (oggi ? 'oggi' : 'il ' + t.toLocaleDateString('it-CH', { day: 'numeric', month: 'long', year: 'numeric' })) + ' alle ' + hm(t) :
+      'Pianeti adesso';
+    $('adesso').classList.toggle('attivo', !S.base && !S.offset);
+  }
+
+  function visibilita(b) {
+    const a = S.alba[b.id];
+    if (b.alt <= 0) {
+      if (a && a.never) return { t: 'Non sorge oggi', ok: false };
+      return { t: a && a.rise ? 'Sorge alle ' + hm(a.rise) : 'Sotto l\'orizzonte', ok: false };
+    }
+    if (b.id === 'sun') return { t: 'Tramonta alle ' + hm(a && a.set), ok: false };
+    const chiaro = S.dati.sunAlt > -6;
+    if (b.id === 'moon') return { t: 'Visibile', ok: true };
+    if (chiaro && !(b.id === 'venus' && S.dati.sunAlt < 0)) return { t: 'Cielo troppo chiaro', ok: false };
+    let t = b.mag <= 5.5 ? 'A occhio nudo' : b.mag <= 7.8 ? 'Con binocolo' : 'Con telescopio';
+    if (b.alt < 8) t += ', molto basso';
+    return { t, ok: b.mag <= 5.5 };
+  }
+
+  function disegnaLista() {
+    const ul = $('lista');
+    ul.innerHTML = '';
+    S.dati.bodies.forEach(b => {
+      const a = S.alba[b.id] || {};
+      const v = visibilita(b);
+      const li = document.createElement('li');
+      li.className = (b.id === S.scelto ? 'sel ' : '') + (b.alt <= 0 ? 'sotto' : '');
+      let dove = b.alt > 0 ? Astro.direction(b.az) + ', alto ' + Math.round(b.alt) + '°' : 'Sotto l\'orizzonte';
+      if (b.alt > 0 && a.set) dove += ' · tramonta ' + hm(a.set);
+      if (b.alt > 0 && a.always) dove += ' · sempre visibile oggi';
+      if (b.id === 'moon') dove += ' · ' + Math.round(b.illum * 100) + '% illuminata';
+      li.innerHTML = '<span class="pallino" style="background:' + b.color + '"></span>' +
+        '<span class="nome">' + b.name + '</span>' +
+        '<span class="vis' + (v.ok ? ' si' : '') + '">' + v.t + '</span>' +
+        '<span class="dove">' + dove + '</span>';
+      li.onclick = () => { S.scelto = b.id; salva('scelto', b.id); aggiorna(); };
+      ul.appendChild(li);
+    });
+  }
+
+  // ---------- Mappa a cupola ----------
+  const cv = $('mappa'), cx = cv.getContext('2d');
+  function dimensiona(c) {
+    const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+    return dpr;
+  }
+
+  function coloreCielo(sunAlt) {
+    if (sunAlt > 0) return ['#3C6CB4', '#6E9AD6'];
+    if (sunAlt > -6) return ['#203C78', '#4A5E9A'];
+    if (sunAlt > -12) return ['#14275A', '#283C70'];
+    if (sunAlt > -18) return ['#0F1D45', '#1B2A55'];
+    return ['#0B1638', '#15264F'];
+  }
+
+  function disegnaLuna(ctx, x, y, r, illum, waxing) {
+    ctx.save();
+    ctx.fillStyle = '#2A3150'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ECE8DA';
+    ctx.beginPath();
+    const lato = waxing ? 1 : -1;            // crescente: illuminata a destra
+    ctx.arc(x, y, r, -Math.PI / 2, Math.PI / 2, lato < 0);
+    const k = 1 - 2 * illum;                 // ellisse del terminatore
+    ctx.ellipse(x, y, Math.abs(k) * r, r, 0, Math.PI / 2, -Math.PI / 2, (k > 0) !== (lato > 0));
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function disegnaMappa() {
+    const dpr = dimensiona(cv), W = cv.width, H = cv.height;
+    const c = cx, m = 26 * dpr, R = Math.min(W, H) / 2 - m, X = W / 2, Y = H / 2;
+    const P = (alt, az) => { const r = R * (90 - alt) / 90; return [X - r * Math.sin(az * D2R), Y - r * Math.cos(az * D2R)]; };
+    c.clearRect(0, 0, W, H);
+    const [c1, c2] = coloreCielo(S.dati.sunAlt);
+    const g = c.createRadialGradient(X, Y, 0, X, Y, R);
+    g.addColorStop(0, c1); g.addColorStop(1, c2);
+    c.fillStyle = g; c.beginPath(); c.arc(X, Y, R, 0, Math.PI * 2); c.fill();
+
+    c.save(); c.beginPath(); c.arc(X, Y, R, 0, Math.PI * 2); c.clip();
+    // cerchi di altezza
+    c.strokeStyle = 'rgba(241,233,210,.10)'; c.lineWidth = dpr;
+    [30, 60].forEach(a => { c.beginPath(); c.arc(X, Y, R * (90 - a) / 90, 0, Math.PI * 2); c.stroke(); });
+    // eclittica
+    c.setLineDash([4 * dpr, 6 * dpr]); c.strokeStyle = 'rgba(205,168,95,.45)';
+    c.beginPath(); let su = false;
+    S.ecl.forEach(p => { if (p.alt > -2) { const [x, y] = P(p.alt, p.az); su ? c.lineTo(x, y) : c.moveTo(x, y); su = true; } else su = false; });
+    c.stroke(); c.setLineDash([]);
+    // costellazioni
+    const st = {}; S.dati.stars.forEach(s => st[s.name] = s);
+    c.strokeStyle = 'rgba(152,163,194,.35)'; c.lineWidth = dpr;
+    Astro.LINES.forEach(([a, b]) => {
+      const A = st[a], B = st[b];
+      if (A.alt > 0 && B.alt > 0) { const p = P(A.alt, A.az), q = P(B.alt, B.az); c.beginPath(); c.moveTo(...p); c.lineTo(...q); c.stroke(); }
+    });
+    // stelle
+    S.hit = [];
+    const notte = S.dati.sunAlt < -6;
+    c.font = (10 * dpr) + 'px ' + getComputedStyle(document.body).fontFamily;
+    S.dati.stars.forEach(s => {
+      if (s.alt <= 0) return;
+      const [x, y] = P(s.alt, s.az), r = Math.max(0.7, 2.6 - s.mag * 0.55) * dpr;
+      c.globalAlpha = notte ? 1 : .35;
+      c.fillStyle = '#F6F1E4'; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+      if (s.mag < 1.3 && notte) { c.fillStyle = 'rgba(241,233,210,.6)'; c.fillText(s.name, x + 5 * dpr, y - 4 * dpr); }
+      c.globalAlpha = 1;
+      S.hit.push({ x, y, tipo: 'stella', o: s });
+    });
+    // corpi
+    const ord = [...S.dati.bodies].sort((a, b) => (a.id === S.scelto) - (b.id === S.scelto));
+    c.font = (13 * dpr) + 'px ' + getComputedStyle(document.querySelector('h1')).fontFamily;
+    ord.forEach(b => {
+      if (b.alt <= 0) return;
+      const [x, y] = P(b.alt, b.az), r = b.size * dpr;
+      if (b.id === 'moon') disegnaLuna(c, x, y, r, b.illum, b.waxing);
+      else {
+        if (b.id === 'sun') { c.fillStyle = 'rgba(255,201,77,.25)'; c.beginPath(); c.arc(x, y, r * 2.2, 0, Math.PI * 2); c.fill(); }
+        c.fillStyle = b.color; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+        if (b.id === 'saturn') { c.strokeStyle = b.color; c.lineWidth = 1.2 * dpr; c.beginPath(); c.ellipse(x, y, r * 2, r * .6, -.4, 0, Math.PI * 2); c.stroke(); }
+      }
+      if (b.id === S.scelto) { c.strokeStyle = '#CDA85F'; c.lineWidth = 2 * dpr; c.beginPath(); c.arc(x, y, r + 7 * dpr, 0, Math.PI * 2); c.stroke(); }
+      c.fillStyle = b.id === S.scelto ? '#CDA85F' : '#F1E9D2';
+      c.fillText(b.name, x + r + 5 * dpr, y + 4 * dpr);
+      S.hit.push({ x, y, tipo: 'corpo', o: b });
+    });
+    c.restore();
+    // bordo e punti cardinali
+    c.strokeStyle = 'rgba(205,168,95,.7)'; c.lineWidth = 1.5 * dpr;
+    c.beginPath(); c.arc(X, Y, R, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = '#CDA85F'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = (15 * dpr) + 'px ' + getComputedStyle(document.querySelector('h1')).fontFamily;
+    [['N', 0], ['E', 90], ['S', 180], ['O', 270]].forEach(([t, az]) => {
+      const rr = R + 13 * dpr; c.fillText(t, X - rr * Math.sin(az * D2R), Y - rr * Math.cos(az * D2R));
+    });
+    c.textAlign = 'start'; c.textBaseline = 'alphabetic';
+  }
+
+  cv.addEventListener('click', e => {
+    const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    const x = (e.clientX - r.left) * dpr, y = (e.clientY - r.top) * dpr;
+    let best = null, bd = 28 * dpr;
+    S.hit.forEach(h => { const d = Math.hypot(h.x - x, h.y - y) - (h.tipo === 'corpo' ? 8 * dpr : 0); if (d < bd) { bd = d; best = h; } });
+    if (best && best.tipo === 'corpo') { S.scelto = best.o.id; salva('scelto', S.scelto); aggiorna(); }
+    else if (best) {
+      $('stato').innerHTML = '<b>' + best.o.name + '</b> · stella · ' + Astro.direction(best.o.az) + ', alta ' + Math.round(best.o.alt) + '°';
+    }
+  });
+
+  // ---------- Tempo ----------
+  $('slider').oninput = e => { S.offset = +e.target.value; aggiorna(); };
+  $('meno').onclick = () => { S.offset = Math.max(-1440, S.offset - 60); $('slider').value = S.offset; aggiorna(); };
+  $('piu').onclick = () => { S.offset = Math.min(1440, S.offset + 60); $('slider').value = S.offset; aggiorna(); };
+  $('adesso').onclick = () => { S.base = null; S.offset = 0; $('slider').value = 0; aggiorna(); };
+  $('data').onclick = () => {
+    const t = ora(); $('inData').value = t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + 'T' + pad(t.getHours()) + ':' + pad(t.getMinutes());
+    $('dlgData').showModal();
+  };
+  $('annullaData').onclick = () => $('dlgData').close();
+  $('salvaData').onclick = () => {
+    const v = $('inData').value; if (!v) return;
+    S.base = new Date(v); S.offset = 0; $('slider').value = 0; $('dlgData').close(); aggiorna();
+  };
+  setInterval(() => { if (!S.base) aggiorna(); }, 30000);
+
+  // ---------- Luogo ----------
+  function mostraLuogo() {
+    const L = pos();
+    $('nomeLuogo').textContent = L.nome + (usaGps() ? ' ±' + Math.round(S.gps.acc) + ' m' : '');
+    $('coord').textContent = Math.abs(L.lat).toFixed(3) + '° ' + (L.lat >= 0 ? 'N' : 'S') + ', ' + Math.abs(L.lon).toFixed(3) + '° ' + (L.lon >= 0 ? 'E' : 'O');
+  }
+  $('btnLuogo').onclick = () => {
+    $('inNome').value = S.luogo.nome; $('inLat').value = S.luogo.lat; $('inLon').value = S.luogo.lon;
+    $('inAutoGps').checked = S.autoGps;
+    $('msgLuogo').textContent = ''; $('dlgLuogo').showModal();
+  };
+  $('annullaLuogo').onclick = () => $('dlgLuogo').close();
+  $('gps').onclick = () => {
+    if (!navigator.geolocation) { $('msgLuogo').textContent = 'Questo browser non dà la posizione: inserisci le coordinate a mano.'; return; }
+    $('msgLuogo').textContent = 'Cerco la posizione…';
+    navigator.geolocation.getCurrentPosition(p => {
+      $('inLat').value = p.coords.latitude.toFixed(4); $('inLon').value = p.coords.longitude.toFixed(4);
+      if ($('inNome').value === S.luogo.nome) $('inNome').value = 'Posizione attuale';
+      $('msgLuogo').textContent = 'Posizione trovata. Premi “Salva luogo”.';
+    }, err => { $('msgLuogo').textContent = 'Posizione non disponibile: attiva la localizzazione o inserisci le coordinate.'; },
+    { enableHighAccuracy: false, timeout: 15000 });
+  };
+  $('salvaLuogo').onclick = () => {
+    const lat = parseFloat(String($('inLat').value).replace(',', '.')), lon = parseFloat(String($('inLon').value).replace(',', '.'));
+    if (!(lat >= -90 && lat <= 90) || !(lon >= -180 && lon <= 180)) { $('msgLuogo').textContent = 'Latitudine tra -90 e 90, longitudine tra -180 e 180.'; return; }
+    S.luogo = { nome: $('inNome').value.trim() || 'Luogo', lat, lon };
+    S.autoGps = $('inAutoGps').checked; salva('autoGps', S.autoGps);
+    if (S.autoGps) avviaGps(false);
+    salva('luogo', S.luogo); S.giornoAlba = ''; $('dlgLuogo').close(); mostraLuogo(); aggiorna();
+  };
+
+  // ---------- Visione notturna ----------
+  function applicaNotturna() { document.body.classList.toggle('notturna', S.notturna); $('notturna').classList.toggle('attivo', S.notturna); }
+  $('notturna').onclick = () => { S.notturna = !S.notturna; salva('notturna', S.notturna); applicaNotturna(); };
+
+  // ---------- GPS ----------
+  let gpsWatch = null;
+  function avviaGps(continuo) {
+    if (!navigator.geolocation) return;
+    const ok = p => {
+      const nuovo = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy || 0 };
+      const spostato = !S.gps || Math.hypot(nuovo.lat - S.gps.lat, (nuovo.lon - S.gps.lon) * Math.cos(nuovo.lat * D2R)) > 0.01;
+      S.gps = nuovo;
+      if (spostato) aggiorna(); else mostraLuogo();
+    };
+    const ko = () => {};
+    if (continuo) {
+      if (gpsWatch == null) gpsWatch = navigator.geolocation.watchPosition(ok, ko, { enableHighAccuracy: true, maximumAge: 30000, timeout: 30000 });
+    } else navigator.geolocation.getCurrentPosition(ok, ko, { enableHighAccuracy: false, maximumAge: 600000, timeout: 20000 });
+  }
+  function fermaGps() { if (gpsWatch != null) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; } }
+
+  // ---------- Modalità "punta il telefono" ----------
+  const arc = $('arcanvas'), ax = arc.getContext('2d');
+  let orient = null, liscio = null, arAttivo = false, stream = null, ultimoEvento = 0;
+  let rotazione = 0;                 // velocità di rotazione dal giroscopio (gradi/s)
+  const storiaAz = [];               // ultime direzioni per stimare la stabilità della bussola
+  let puntamento = { az: 0, alt: 0 };
+  let allineaSu = null;              // oggetto scelto per l'allineamento
+  let otto = null;                   // stato della calibrazione a 8
+  let msgFino = 0;                   // tiene visibile un messaggio per qualche secondo
+  const haSensori = 'ondeviceorientationabsolute' in window || 'DeviceOrientationEvent' in window;
+  if (haSensori && matchMedia('(pointer: coarse)').matches) $('rigaPunta').hidden = false;
+
+  function onOrient(e) {
+    if (e.alpha == null) return;
+    if (e.type === 'deviceorientation' && !e.absolute && 'ondeviceorientationabsolute' in window) return;
+    orient = { a: e.alpha, b: e.beta, g: e.gamma }; ultimoEvento = Date.now();
+    if (otto) registraOtto(orient);
+  }
+  function onMotion(e) {
+    const r = e.rotationRate; if (!r) return;
+    rotazione = Math.hypot(r.alpha || 0, r.beta || 0, r.gamma || 0);
+  }
+
+  const nrm = v => { const l = Math.hypot(...v) || 1; return v.map(x => x / l); };
+  const enu = (alt, az) => [Math.cos(alt * D2R) * Math.sin(az * D2R), Math.cos(alt * D2R) * Math.cos(az * D2R), Math.sin(alt * D2R)];
+  const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+  const altAz = F => ({ alt: Math.asin(Math.max(-1, Math.min(1, F[2]))) / D2R, az: (Math.atan2(F[0], F[1]) / D2R + 360) % 360 });
+
+  // Vettori della fotocamera in coordinate Est-Nord-Alto, senza correzioni
+  function baseGrezza(o) {
+    const a = o.a * D2R, b = o.b * D2R, g = o.g * D2R;
+    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b), cg = Math.cos(g), sg = Math.sin(g);
+    const X = [ca * cg - sa * sb * sg, cg * sa + ca * sb * sg, -cb * sg];
+    const Y = [-cb * sa, ca * cb, sb];
+    const F = [-(cg * sa * sb + ca * sg), -(sa * sg - ca * cg * sb), -cb * cg];
+    const th = ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * D2R;
+    const U = Y.map((v, i) => Math.cos(th) * v + Math.sin(th) * X[i]);
+    const Rt = X.map((v, i) => Math.cos(th) * v - Math.sin(th) * Y[i]);
+    return { F, U, Rt };
+  }
+  // Applica le correzioni di calibrazione: azimut (rotazione attorno alla verticale) e altezza (attorno all'asse destro)
+  function corretta(b) {
+    const k = -S.correzione * D2R;
+    const rz = v => [v[0] * Math.cos(k) - v[1] * Math.sin(k), v[0] * Math.sin(k) + v[1] * Math.cos(k), v[2]];
+    let F = rz(b.F), U = rz(b.U), Rt = rz(b.Rt);
+    const d = S.corrAlt * D2R;
+    const F2 = F.map((v, i) => v * Math.cos(d) + U[i] * Math.sin(d));
+    const U2 = U.map((v, i) => v * Math.cos(d) - F[i] * Math.sin(d));
+    return { F: F2, U: U2, Rt };
+  }
+
+  // Stabilità della bussola: dispersione della direzione mentre il telefono è fermo
+  function aggiornaQualita(az) {
+    const now = Date.now();
+    storiaAz.push({ t: now, az, fermo: rotazione < 6 });
+    while (storiaAz.length && now - storiaAz[0].t > 1500) storiaAz.shift();
+    const fermi = storiaAz.filter(s => s.fermo);
+    if (fermi.length < 15) { $('qualita').innerHTML = 'Bussola: tieni fermo il telefono un attimo per misurarla'; return; }
+    const ref = fermi[0].az;
+    const diff = fermi.map(s => ((s.az - ref + 540) % 360) - 180);
+    const m = diff.reduce((a, b) => a + b, 0) / diff.length;
+    const sd = Math.sqrt(diff.reduce((a, b) => a + (b - m) ** 2, 0) / diff.length);
+    let t, col;
+    if (sd < 0.8) { t = 'ottima'; col = '#CDA85F'; }
+    else if (sd < 2) { t = 'buona'; col = '#F1E9D2'; }
+    else if (sd < 5) { t = 'incerta: prova a calibrarla'; col = '#E8A15A'; }
+    else { t = 'disturbata: allontanati dai metalli e calibrala'; col = '#EE6A43'; }
+    $('qualita').innerHTML = 'Bussola <b style="color:' + col + '">' + t + '</b>' + (S.gps ? ' · GPS ±' + Math.round(S.gps.acc) + ' m' : ' · ' + S.luogo.nome);
+  }
+
+  function scelteAR() {
+    const box = $('scelte'); box.innerHTML = '';
+    S.dati.bodies.forEach(b => {
+      const bt = document.createElement('button');
+      bt.className = 'pill' + (b.id === S.scelto ? ' attivo' : '');
+      bt.textContent = b.name + (b.alt <= 0 ? ' ↓' : '');
+      bt.onclick = () => { S.scelto = b.id; salva('scelto', b.id); scelteAR(); };
+      box.appendChild(bt);
+    });
+  }
+
+  function cicloAR() {
+    if (!arAttivo) return;
+    requestAnimationFrame(cicloAR);
+    const dpr = window.devicePixelRatio || 1;
+    if (arc.width !== Math.round(arc.clientWidth * dpr) || arc.height !== Math.round(arc.clientHeight * dpr)) dimensiona(arc);
+    const W = arc.width, H = arc.height, c = ax;
+    c.clearRect(0, 0, W, H);
+    if (!orient) { $('guida').textContent = Date.now() - ultimoEvento > 3000 ? 'Bussola non disponibile su questo browser' : 'Attendo la bussola…'; return; }
+    const b0 = corretta(baseGrezza(orient));
+    if (!liscio) liscio = b0;
+    // filtro più morbido quando il telefono è fermo, più reattivo quando si muove
+    const f = rotazione > 40 ? 0.5 : rotazione > 10 ? 0.3 : 0.12;
+    const mix = (p, q) => nrm(p.map((v, i) => v + (q[i] - v) * f));
+    liscio = { F: mix(liscio.F, b0.F), U: mix(liscio.U, b0.U), Rt: mix(liscio.Rt, b0.Rt) };
+    const { F, U, Rt } = liscio;
+    const fov = 62, foc = (H / 2) / Math.tan(fov / 2 * D2R);
+    const proj = d => { const z = dot(d, F); if (z <= 0.05) return null; return [W / 2 + dot(d, Rt) / z * foc, H / 2 - dot(d, U) / z * foc]; };
+    const serif = getComputedStyle(document.querySelector('h1')).fontFamily;
+
+    // orizzonte e punti cardinali
+    c.strokeStyle = 'rgba(205,168,95,.8)'; c.lineWidth = 2 * dpr; c.beginPath(); let on = false;
+    for (let az = 0; az <= 360; az += 2) { const p = proj(enu(0, az)); if (p) { on ? c.lineTo(...p) : c.moveTo(...p); on = true; } else on = false; }
+    c.stroke();
+    c.font = (18 * dpr) + 'px ' + serif; c.textAlign = 'center';
+    [['Nord', 0], ['Nord-Est', 45], ['Est', 90], ['Sud-Est', 135], ['Sud', 180], ['Sud-Ovest', 225], ['Ovest', 270], ['Nord-Ovest', 315]].forEach(([t, az]) => {
+      const p = proj(enu(-3, az)); if (p) { c.fillStyle = '#CDA85F'; c.fillText(t, p[0], p[1] + 14 * dpr); }
+    });
+    // eclittica
+    c.setLineDash([5 * dpr, 7 * dpr]); c.strokeStyle = 'rgba(205,168,95,.5)'; c.lineWidth = 1.2 * dpr; c.beginPath(); on = false;
+    S.ecl.forEach(pt => { const p = proj(enu(pt.alt, pt.az)); if (p) { on ? c.lineTo(...p) : c.moveTo(...p); on = true; } else on = false; });
+    c.stroke(); c.setLineDash([]);
+    // costellazioni e stelle
+    const st = {}; S.dati.stars.forEach(s => st[s.name] = s);
+    c.strokeStyle = 'rgba(200,210,235,.45)'; c.lineWidth = 1.2 * dpr;
+    Astro.LINES.forEach(([a, b]) => {
+      const p = proj(enu(st[a].alt, st[a].az)), q = proj(enu(st[b].alt, st[b].az));
+      if (p && q) { c.beginPath(); c.moveTo(...p); c.lineTo(...q); c.stroke(); }
+    });
+    c.font = (12 * dpr) + 'px system-ui'; c.textAlign = 'left';
+    S.dati.stars.forEach(s => {
+      const p = proj(enu(s.alt, s.az)); if (!p) return;
+      c.fillStyle = '#FFFFFF'; c.beginPath(); c.arc(p[0], p[1], Math.max(1.2, 3.4 - s.mag * .7) * dpr, 0, Math.PI * 2); c.fill();
+      if (s.mag < 1.6 || (allineaSu && allineaSu.name === s.name)) { c.fillStyle = 'rgba(241,233,210,.75)'; c.fillText(s.name, p[0] + 6 * dpr, p[1] - 5 * dpr); }
+    });
+    // corpi
+    c.font = (17 * dpr) + 'px ' + serif;
+    let target = null;
+    S.dati.bodies.forEach(b => {
+      if (b.id === S.scelto) target = b;
+      const p = proj(enu(b.alt, b.az)); if (!p) return;
+      const r = b.size * 1.6 * dpr;
+      if (b.id === 'moon') disegnaLuna(c, p[0], p[1], r * 1.4, b.illum, b.waxing);
+      else { c.fillStyle = b.color; c.beginPath(); c.arc(p[0], p[1], r, 0, Math.PI * 2); c.fill(); }
+      if (b.id === S.scelto && !allineaSu) { c.strokeStyle = '#CDA85F'; c.lineWidth = 2.5 * dpr; c.beginPath(); c.arc(p[0], p[1], r + 12 * dpr, 0, Math.PI * 2); c.stroke(); }
+      c.fillStyle = b.alt > 0 ? '#F1E9D2' : 'rgba(241,233,210,.5)';
+      c.fillText(b.name + (b.alt <= 0 ? ' (sotto l\'orizzonte)' : ''), p[0] + r + 8 * dpr, p[1] + 6 * dpr);
+    });
+    // mirino (più evidente durante l'allineamento)
+    c.strokeStyle = allineaSu ? '#CDA85F' : 'rgba(241,233,210,.5)'; c.lineWidth = (allineaSu ? 2 : 1) * dpr;
+    c.beginPath(); c.arc(W / 2, H / 2, 16 * dpr, 0, Math.PI * 2); c.stroke();
+    if (allineaSu) {
+      c.beginPath();
+      [[-40, 0, -22, 0], [22, 0, 40, 0], [0, -40, 0, -22], [0, 22, 0, 40]].forEach(([x1, y1, x2, y2]) => { c.moveTo(W / 2 + x1 * dpr, H / 2 + y1 * dpr); c.lineTo(W / 2 + x2 * dpr, H / 2 + y2 * dpr); });
+      c.stroke();
+    }
+
+    puntamento = altAz(F);
+    const { alt, az } = puntamento;
+    aggiornaQualita(altAz(b0.F).az);
+    $('mira').textContent = 'Stai puntando ' + Astro.direction(az) + ' (' + Math.round(az) + '°), altezza ' + Math.round(alt) + '°';
+
+    if (allineaSu) { $('guida').textContent = ''; return; }
+    if (Date.now() < msgFino) return;
+    // guida verso l'oggetto scelto
+    if (target) {
+      const daz = ((target.az - az + 540) % 360) - 180, dal = target.alt - alt;
+      const dist = Math.hypot(daz * Math.cos(alt * D2R), dal);
+      const al = S.alba[target.id];
+      if (target.alt <= 0) {
+        let txt = target.name + ' è sotto l\'orizzonte';
+        if (al && al.rise) {
+          const L = pos(), dove = Astro.position(target.id, L.lat, L.lon, Astro.jd(al.rise));
+          txt += ', sorge alle ' + hm(al.rise) + ' verso ' + Astro.direction(dove.az);
+        }
+        $('guida').textContent = txt;
+      }
+      else if (dist < 6) $('guida').textContent = target.name + ' è qui';
+      else {
+        const parti = [];
+        if (Math.abs(daz) > 4) parti.push('gira a ' + (daz > 0 ? 'destra' : 'sinistra') + ' ' + Math.round(Math.abs(daz)) + '°');
+        if (Math.abs(dal) > 4) parti.push((dal > 0 ? 'alza' : 'abbassa') + ' ' + Math.round(Math.abs(dal)) + '°');
+        $('guida').textContent = target.name + ': ' + parti.join(', ');
+        const d = enu(target.alt, target.az);
+        let vx = dot(d, Rt), vy = dot(d, U);
+        if (Math.hypot(vx, vy) < 1e-3) vx = 1;
+        const ang = Math.atan2(-vy, vx), rr = Math.min(W, H) * 0.36;
+        c.save(); c.translate(W / 2 + Math.cos(ang) * rr, H / 2 + Math.sin(ang) * rr); c.rotate(ang); c.fillStyle = '#CDA85F';
+        c.beginPath(); c.moveTo(22 * dpr, 0); c.lineTo(-10 * dpr, -14 * dpr); c.lineTo(-4 * dpr, 0); c.lineTo(-10 * dpr, 14 * dpr); c.closePath(); c.fill();
+        c.restore();
+      }
+    }
+  }
+
+  // ---------- Pannello di calibrazione ----------
+  function mostraCorrezione() {
+    $('valAz').textContent = (S.correzione >= 0 ? '+' : '') + S.correzione.toFixed(1) + '°';
+    $('valAlt').textContent = (S.corrAlt >= 0 ? '+' : '') + S.corrAlt.toFixed(1) + '°';
+    $('fonteLuogo').textContent = S.gps ? 'Posizione dal GPS, precisione ±' + Math.round(S.gps.acc) + ' m.' :
+      'GPS non ancora disponibile: uso ' + S.luogo.nome + '. Attiva la localizzazione del telefono.';
+  }
+  function salvaCorrezioni() { salva('correzione', S.correzione); salva('corrAlt', S.corrAlt); mostraCorrezione(); liscio = null; }
+
+  function candidatiAllineamento() {
+    const lista = [];
+    S.dati.bodies.forEach(b => { if (b.id !== 'sun' && b.alt > 5 && b.mag < 1.5) lista.push({ name: b.name, alt: b.alt, az: b.az, mag: b.mag }); });
+    S.dati.stars.forEach(s => { if (s.alt > 5 && s.mag < 1.4) lista.push({ name: s.name, alt: s.alt, az: s.az, mag: s.mag }); });
+    // prima i più vicini a dove stai puntando, a parità i più luminosi
+    const sep = o => Math.hypot(((o.az - puntamento.az + 540) % 360) - 180, o.alt - puntamento.alt);
+    return lista.sort((a, b) => (sep(a) - sep(b)) + (a.mag - b.mag) * 8).slice(0, 10);
+  }
+  function apriFoglio() {
+    mostraCorrezione();
+    const box = $('sceltiAllinea'); box.innerHTML = '';
+    const cand = candidatiAllineamento();
+    if (!cand.length) box.innerHTML = '<p>Nessun oggetto luminoso sopra l\'orizzonte in questo momento.</p>';
+    cand.forEach(o => {
+      const bt = document.createElement('button'); bt.className = 'pill'; bt.textContent = o.name;
+      bt.onclick = () => iniziaAllineamento(o.name);
+      box.appendChild(bt);
+    });
+    $('foglio').classList.add('aperto');
+  }
+  $('apriCal').onclick = apriFoglio;
+  $('chiudiFoglio').onclick = () => $('foglio').classList.remove('aperto');
+  $('azMeno').onclick = () => { S.correzione -= 0.5; salvaCorrezioni(); };
+  $('azPiu').onclick = () => { S.correzione += 0.5; salvaCorrezioni(); };
+  $('altMeno').onclick = () => { S.corrAlt -= 0.5; salvaCorrezioni(); };
+  $('altPiu').onclick = () => { S.corrAlt += 0.5; salvaCorrezioni(); };
+  $('azzera').onclick = () => { S.correzione = 3; S.corrAlt = 0; salvaCorrezioni(); };
+
+  // ---------- Allineamento su un astro ----------
+  function trovaOggetto(nome) {
+    return S.dati.bodies.find(b => b.name === nome) || S.dati.stars.find(s => s.name === nome);
+  }
+  function iniziaAllineamento(nome) {
+    allineaSu = { name: nome };
+    $('foglio').classList.remove('aperto');
+    $('allineaTesto').textContent = 'Centra ' + nome + ' vero nel mirino, non il disegno, e tieni fermo il telefono';
+    $('allinea').classList.add('aperto');
+    if (!stream) avviaCamera();
+  }
+  $('allineaNo').onclick = () => { allineaSu = null; $('allinea').classList.remove('aperto'); };
+  $('allineaOk').onclick = () => {
+    const o = trovaOggetto(allineaSu.name);
+    if (!o || o.alt <= 0) { $('allineaTesto').textContent = allineaSu.name + ' ora è sotto l\'orizzonte: scegline un altro'; return; }
+    const daz = ((o.az - puntamento.az + 540) % 360) - 180, dal = o.alt - puntamento.alt;
+    const errore = Math.hypot(daz * Math.cos(o.alt * D2R), dal);
+    if (errore > 35 && !allineaSu.confermato) {
+      allineaSu.confermato = true;
+      $('allineaTesto').textContent = 'La differenza è di ' + Math.round(errore) + '°: sei sicuro che sia ' + o.name + '? Tocca di nuovo per confermare';
+      return;
+    }
+    S.correzione = Math.round((S.correzione + daz) * 10) / 10;
+    S.corrAlt = Math.max(-15, Math.min(15, Math.round((S.corrAlt + dal) * 10) / 10));
+    salvaCorrezioni();
+    allineaSu = null; $('allinea').classList.remove('aperto');
+    msgFino = Date.now() + 5000;
+    $('guida').textContent = 'Allineato su ' + o.name + ' (corretti ' + Math.round(Math.abs(daz) * 10) / 10 + '° in direzione e ' + Math.round(Math.abs(dal) * 10) / 10 + '° in altezza)';
+  };
+
+  // ---------- Calibrazione a 8 ----------
+  const oc = $('ottoCanvas'), octx = oc.getContext('2d');
+  function registraOtto(o) {
+    const s = otto;
+    if (s.prevA != null) { let d = o.a - s.prevA; d = ((d + 540) % 360) - 180; s.giroA += Math.abs(d); }
+    s.prevA = o.a;
+    s.minB = Math.min(s.minB, o.b); s.maxB = Math.max(s.maxB, o.b);
+    s.minG = Math.min(s.minG, o.g); s.maxG = Math.max(s.maxG, o.g);
+  }
+  function cicloOtto(t0) {
+    if (!otto) return;
+    const t = (performance.now() - t0) / 1000, dpr = window.devicePixelRatio || 1;
+    oc.width = oc.clientWidth * dpr; oc.height = oc.clientHeight * dpr;
+    const W = oc.width, H = oc.height, cx = W / 2, cy = H / 2, A = W * 0.38, B = H * 0.38;
+    octx.clearRect(0, 0, W, H);
+    octx.strokeStyle = 'rgba(205,168,95,.5)'; octx.lineWidth = 3 * dpr; octx.beginPath();
+    for (let k = 0; k <= 200; k++) { const u = k / 200 * Math.PI * 2, x = cx + A * Math.sin(u), y = cy + B * Math.sin(2 * u); k ? octx.lineTo(x, y) : octx.moveTo(x, y); }
+    octx.stroke();
+    const u = t * 2.2, x = cx + A * Math.sin(u), y = cy + B * Math.sin(2 * u);
+    octx.save(); octx.translate(x, y); octx.rotate(Math.cos(u) * 0.6);
+    octx.fillStyle = '#F1E9D2'; octx.fillRect(-11 * dpr, -19 * dpr, 22 * dpr, 38 * dpr);
+    octx.fillStyle = '#15264F'; octx.fillRect(-8 * dpr, -15 * dpr, 16 * dpr, 28 * dpr);
+    octx.restore();
+    const s = otto;
+    const p = Math.min(1, s.giroA / 360) * 0.4 + Math.min(1, (s.maxB - s.minB) / 100) * 0.3 + Math.min(1, (s.maxG - s.minG) / 100) * 0.3;
+    const pt = Math.min(p, t / 6);           // almeno 6 secondi di movimento
+    $('ottoBarra').style.width = Math.round(pt * 100) + '%';
+    if (pt >= 1) {
+      otto = null; liscio = null; storiaAz.length = 0;
+      $('ottoTitolo').textContent = 'Fatto';
+      $('ottoTesto').textContent = 'Ora tieni fermo il telefono: in basso vedi la stabilità della bussola. Per la massima precisione allinea su un astro.';
+      $('ottoStop').textContent = 'Continua';
+      return;
+    }
+    requestAnimationFrame(() => cicloOtto(t0));
+  }
+  $('avviaOtto').onclick = () => {
+    $('foglio').classList.remove('aperto');
+    otto = { giroA: 0, prevA: null, minB: 999, maxB: -999, minG: 999, maxG: -999 };
+    $('ottoTitolo').textContent = 'Disegna un 8 in aria';
+    $('ottoTesto').textContent = 'Ruota anche il polso, inclinando il telefono in avanti, indietro e di lato.';
+    $('ottoStop').textContent = 'Interrompi'; $('ottoBarra').style.width = '0%';
+    $('otto').classList.add('aperto');
+    const t0 = performance.now(); requestAnimationFrame(() => cicloOtto(t0));
+  };
+  $('ottoStop').onclick = () => { otto = null; $('otto').classList.remove('aperto'); };
+
+  // ---------- Camera e apertura ----------
+  async function avviaCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      $('video').srcObject = stream; $('camera').classList.add('attivo');
+    } catch (e) { $('guida').textContent = 'Camera non disponibile: la mappa funziona lo stesso'; }
+  }
+  function fermaCamera() {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null; $('video').srcObject = null; $('camera').classList.remove('attivo');
+  }
+
+  $('apriAR').onclick = async () => {
+    try { if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); } catch (e) {}
+    window.addEventListener('deviceorientationabsolute', onOrient);
+    window.addEventListener('deviceorientation', onOrient);
+    window.addEventListener('devicemotion', onMotion);
+    $('ar').classList.add('aperto'); arAttivo = true; liscio = null; ultimoEvento = Date.now(); storiaAz.length = 0;
+    avviaGps(true);
+    aggiorna(); scelteAR(); dimensiona(arc);
+    try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('portrait'); } catch (e) {}
+    cicloAR();
+  };
+  $('chiudiAR').onclick = () => {
+    arAttivo = false; allineaSu = null; otto = null; fermaCamera(); fermaGps();
+    ['foglio', 'allinea', 'otto', 'ar'].forEach(id => $(id).classList.remove('aperto'));
+    window.removeEventListener('deviceorientationabsolute', onOrient);
+    window.removeEventListener('deviceorientation', onOrient);
+    window.removeEventListener('devicemotion', onMotion);
+    try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+    aggiorna();
+  };
+  $('camera').onclick = () => stream ? fermaCamera() : avviaCamera();
+
+  // ---------- Avvio ----------
+  window.addEventListener('resize', () => S.dati && disegnaMappa());
+  applicaNotturna(); aggiorna();
+  if (S.autoGps) avviaGps(false);
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
