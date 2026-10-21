@@ -153,6 +153,15 @@ details.formula summary { cursor: pointer; color: var(--ottone); }
 details.formula code { display: block; background: rgba(0,0,0,.25); border-radius: 8px; padding: 8px 10px; margin: 6px 0; color: var(--avorio); white-space: pre-wrap; font-size: .8rem; }
 dialog select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--filo); background: var(--notte); color: var(--avorio); font: inherit; }
 
+#v3d { position: fixed; inset: 0; z-index: 30; background: #050A18; display: none; flex-direction: column; align-items: center; padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px calc(env(safe-area-inset-bottom, 0px) + 14px); overflow-y: auto; }
+#v3d.aperto { display: flex; }
+.v3d-top { width: min(640px, 100%); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.v3d-top h2 { font-family: var(--serif); font-weight: 400; font-size: 1.6rem; margin: 0; }
+#v3dCanvas { width: min(640px, 100%, 62vh); aspect-ratio: 1; display: block; margin: 10px 0; touch-action: none; cursor: grab; }
+.v3d-info { width: min(640px, 100%); font-size: .9rem; color: var(--nebbia); line-height: 1.55; }
+.v3d-info b { color: var(--avorio); font-weight: 500; }
+.v3d-bott { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+
 #rosso { position: fixed; inset: 0; background: #FF2A1A; mix-blend-mode: multiply; pointer-events: none; z-index: 50; display: none; }
 body.notturna #rosso { display: block; }
 body.notturna #video { filter: grayscale(1) brightness(.6); }
@@ -326,6 +335,18 @@ q_profondo  = (1 − nuvole) × (1 − 0,7 × luna)</code>
     <div class="barra"><i id="ottoBarra"></i></div>
     <button class="pill" id="ottoStop" style="margin-top:12px">Interrompi</button>
   </div>
+</div>
+
+<div id="v3d" aria-label="Vista 3D del pianeta">
+  <div class="v3d-top"><h2 id="v3dTitolo">Pianeta</h2><button class="pill" id="v3dChiudi">Chiudi</button></div>
+  <canvas id="v3dCanvas"></canvas>
+  <div class="v3d-bott">
+    <button class="pill attivo" id="v3dTerra">Vista dalla Terra</button>
+    <button class="pill" id="v3dLune">Con le lune</button>
+    <button class="pill" id="v3dOra">−1 ora</button>
+    <button class="pill" id="v3dOraP">+1 ora</button>
+  </div>
+  <div class="v3d-info" id="v3dInfo"></div>
 </div>
 
 <script>
@@ -683,7 +704,7 @@ const Astro = (() => {
     const Ds = 3.12 * sin(lam + 42.8);
     const De = Ds - 2.22 * sin(psi) * cos(lam + 22) - 1.30 * (r - Dl) / Dl * sin(lam - 100.5);
     return [['Io', u1, r1], ['Europa', u2, r2], ['Ganimede', u3, r3], ['Callisto', u4, r4]].map(([name, u, rr]) => ({
-      name, x: rr * sin(u), y: -rr * cos(u) * sin(De), davanti: cos(u) > 0, cosu: cos(u)
+      name, x: rr * sin(u), y: -rr * cos(u) * sin(De), z: rr * cos(u), r: rr, davanti: cos(u) > 0, cosu: cos(u)
     }));
   }
 
@@ -890,10 +911,11 @@ const CATALOGO = {"N":114142,"N6":8920,"ra":"BkhCRB6YYZyQxk046zenUV8RJD8DlrHTuoQ
     }
     if (o.tipo !== 'pianeta' && o.alt <= 0) righe = righe.replace(riga('Posizione', posz), riga('Posizione', 'Sotto l\'orizzonte in questo momento'));
     box.innerHTML = '<h2>' + o.name + '</h2><div class="tipo">' + tipo + '</div><dl>' + righe + '</dl>' + extra +
-      '<div class="bottoni"><button class="pill" id="sCentra">Mostra sulla mappa</button>' +
+      '<div class="bottoni">' + (o.tipo === 'pianeta' && FIS[o.id] ? '<button class="pill attivo" id="s3d">Vista 3D</button>' : '') + '<button class="pill" id="sCentra">Mostra sulla mappa</button>' +
       (!$('rigaPunta').hidden ? '<button class="pill attivo" id="sGuida">Guidami col telefono</button>' : '') + '</div>';
     $('sCentra').onclick = () => { centraSu(o); disegnaMappa(); };
     if ($('sGuida')) $('sGuida').onclick = () => $('apriAR').click();
+    if ($('s3d')) $('s3d').onclick = () => apriVista3D(o.id);
     if (o.id === 'jupiter') disegnaLune();
   }
   function disegnaLune() {
@@ -1583,6 +1605,227 @@ const CATALOGO = {"N":114142,"N6":8920,"ra":"BkhCRB6YYZyQxk046zenUV8RJD8DlrHTuoQ
     aggiorna();
   };
   $('camera').onclick = () => stream ? fermaCamera() : avviaCamera();
+
+  // ---------- Vista 3D dei pianeti ----------
+  // Raggio equatoriale (km), schiacciamento, polo nord (AR, Dec J2000, IAU)
+  const FIS = {
+    mercury: { R: 2440, f: 0, polo: [281.01, 61.42] },
+    venus: { R: 6052, f: 0, polo: [272.76, 67.16] },
+    moon: { R: 1737.4, f: 0, polo: [270.0, 66.54] },
+    mars: { R: 3396, f: 0.00589, polo: [317.68, 52.89] },
+    jupiter: { R: 71492, f: 0.06487, polo: [268.057, 64.495] },
+    saturn: { R: 60268, f: 0.09796, polo: [40.589, 83.537] },
+    uranus: { R: 25559, f: 0.0229, polo: [257.311, -15.175] },
+    neptune: { R: 24764, f: 0.0171, polo: [299.36, 43.46] }
+  };
+  const V3 = { id: null, yaw: 0, pitch: 0, lune: false, minuti: 0, trascina: null };
+  const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k], cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const unit = a => mul(a, 1 / Math.hypot(...a));
+  const vRD = (ra, de) => [Math.cos(de * D2R) * Math.cos(ra * D2R), Math.cos(de * D2R) * Math.sin(ra * D2R), Math.sin(de * D2R)];
+
+  // Mari lunari: [lat, lon est, raggio in gradi]
+  const MARI = [[32.8, -15.6, 17], [28, 17.5, 10], [8.5, 31.4, 12], [17, 59.1, 8], [-7.8, 53.7, 11], [-15.2, 35.5, 5.5], [-21.3, -16.6, 10],
+    [18, -57, 20], [0, -45, 14], [-5, -30, 9], [56, -15, 6], [57, 10, 6], [56, 30, 5], [-24.4, -38.6, 6], [13.3, 3.6, 4], [-10, -23, 6], [5, -15, 5]];
+
+  function scenaV3() {
+    const L = pos(), t = new Date(ora().getTime() + V3.minuti * 60000), j = Astro.jd(t), T = Astro.centuries(j);
+    const id = V3.id, fis = FIS[id];
+    const p = Astro.position(id, L.lat, L.lon, j), sole = Astro.position('sun', L.lat, L.lon, j);
+    const distKm = id === 'moon' ? p.distKm : p.dist * 149597870.7;
+    const d = vRD(p.ra, p.dec), g = mul(d, distKm), gs = mul(vRD(sole.ra, sole.dec), sole.dist * 149597870.7);
+    const s = unit(sub(gs, g));                        // dal pianeta verso il Sole
+    const polo = unit(vRD(fis.polo[0], fis.polo[1]));
+    // base "vista dalla Terra": destra = Ovest, alto = Nord celeste, V verso l'osservatore
+    const est = unit([-Math.sin(p.ra * D2R), Math.cos(p.ra * D2R), 0]);
+    const nord = cross(d, est), V0 = mul(d, -1), R0 = mul(est, -1), U0 = nord;
+    // rotazione libera dell'utente
+    const cy = Math.cos(V3.yaw), sy = Math.sin(V3.yaw), cp = Math.cos(V3.pitch), sp = Math.sin(V3.pitch);
+    let R = add(mul(R0, cy), mul(V0, sy)), V = sub(mul(V0, cy), mul(R0, sy)), U = U0;
+    const U2 = add(mul(U, cp), mul(V, sp)), V2 = sub(mul(V, cp), mul(U, sp));
+    // satelliti in coordinate assolute (raggi del pianeta)
+    const lune = [];
+    if (id === 'jupiter') {
+      const pr = [dot(polo, R0), dot(polo, U0)], l = Math.hypot(...pr) || 1;
+      const yq = add(mul(R0, pr[0] / l), mul(U0, pr[1] / l)), xq = add(mul(R0, pr[1] / l), mul(U0, -pr[0] / l));
+      const RAGGI = { Io: 1821.6, Europa: 1560.8, Ganimede: 2634.1, Callisto: 2410.3 };
+      Astro.galilean(j).forEach(m => lune.push({ nome: m.name, pos: add(add(mul(xq, m.x), mul(yq, m.y)), mul(V0, m.z)), r: RAGGI[m.name] / fis.R }));
+    }
+    if (id === 'saturn') {
+      const Ax = unit(cross([0, 0, 1], polo)), Bx = cross(polo, Ax);
+      const Lm = 6.117 + 22.577006 * (j - 2451545), M = (Lm - 36.8) * D2R, e = 0.0277;
+      const th = Lm * D2R + 2 * e * Math.sin(M), rr = 20.27 * (1 - e * Math.cos(M));
+      lune.push({ nome: 'Titano', pos: mul(add(mul(Ax, Math.cos(th)), mul(Bx, Math.sin(th))), rr), r: 2574.7 / fis.R });
+    }
+    return { t, p, fis, d, s, polo, R: R, U: U2, V: V2, R0, U0, V0, distKm, lune, id };
+  }
+
+  function disegnaV3(veloce) {
+    if (!V3.id) return;
+    const cv = $('v3dCanvas'), r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    const N = Math.round(Math.min(veloce ? 300 : 640, r.width * dpr));
+    cv.width = N; cv.height = N;
+    const c = cv.getContext('2d'), img = c.createImageData(N, N), px = img.data;
+    const sc = scenaV3(), { s, polo, R, U, V, fis, id } = sc;
+    const kf = 1 / (1 - fis.f) - 1;
+    const sfera = v => add(v, mul(polo, kf * dot(v, polo)));        // spazio ellissoide -> sfera
+    const campo = V3.lune && sc.lune.length ? (id === 'jupiter' ? 28 : 23) : (id === 'saturn' ? 2.45 : 1.18);
+    const pxR = N / 2 / campo;
+    const dir = mul(V, -1), dS = sfera(dir), dS2 = dot(dS, dS);
+    const anelli = id === 'saturn';
+    // colpisce il pianeta da un punto o lungo una direzione
+    const colpisce = (o, dv) => { const oS = sfera(o), dvS = sfera(dv); const a = dot(dvS, dvS), b = 2 * dot(oS, dvS), cc = dot(oS, oS) - 1, D = b * b - 4 * a * cc; if (D < 0) return -1; const t1 = (-b - Math.sqrt(D)) / (2 * a); return t1 > 1e-4 ? t1 : ((-b + Math.sqrt(D)) / (2 * a) > 1e-4 ? 0.0001 : -1); };
+    // colore della superficie secondo la latitudine (e longitudine per la Luna)
+    let xb = null, yb = null;
+    if (id === 'moon') { xb = unit(sub(sc.V0, mul(polo, dot(sc.V0, polo)))); yb = cross(polo, xb); }
+    const superficie = (q, lat) => {
+      const al = Math.abs(lat);
+      switch (id) {
+        case 'jupiter': {
+          if (al > 48) return [176, 160, 140];
+          const bande = [[-90, -40, [190, 170, 145]], [-40, -33, [205, 185, 160]], [-33, -27, [165, 130, 100]], [-27, -20, [230, 215, 190]], [-20, -7, [175, 125, 90]],
+            [-7, 7, [238, 228, 205]], [7, 18, [170, 120, 85]], [18, 24, [232, 218, 192]], [24, 31, [178, 140, 108]], [31, 90, [210, 192, 166]]];
+          for (const [a, b, col] of bande) if (lat >= a && lat < b) return col;
+          return [220, 200, 170];
+        }
+        case 'saturn': return al > 60 ? [190, 175, 140] : al < 10 ? [238, 222, 175] : (Math.floor((al - 10) / 9) % 2 ? [222, 200, 150] : [212, 188, 138]);
+        case 'mars': return (lat > 72 || lat < -78) ? [242, 240, 236] : [205, 105, 62];
+        case 'venus': return [242, 232, 200];
+        case 'mercury': return [158, 152, 142];
+        case 'uranus': return [170, 226, 230];
+        case 'neptune': return al < 15 ? [86, 122, 222] : [80, 112, 214];
+        case 'moon': {
+          const lon = Math.atan2(dot(q, yb), dot(q, xb)) / D2R;
+          let mare = 0;
+          for (const [la, lo, rg] of MARI) {
+            const cd = Math.sin(lat * D2R) * Math.sin(la * D2R) + Math.cos(lat * D2R) * Math.cos(la * D2R) * Math.cos((lon - lo) * D2R);
+            const dd = Math.acos(Math.max(-1, Math.min(1, cd))) / D2R;
+            if (dd < rg + 3) mare = Math.max(mare, Math.min(1, (rg + 3 - dd) / 7));
+          }
+          return [190 - mare * 82, 186 - mare * 82, 178 - mare * 80];
+        }
+      }
+      return [200, 200, 200];
+    };
+    const RING = [[1.239, 1.527, 0.18, [150, 138, 115]], [1.527, 1.951, 0.92, [232, 218, 178]], [1.951, 2.025, 0.06, [120, 110, 90]], [2.025, 2.214, 0.62, [210, 196, 158]], [2.214, 2.222, 0.05, [120, 110, 90]], [2.222, 2.269, 0.55, [205, 190, 152]]];
+    const anello = rr => { for (const a of RING) if (rr >= a[0] && rr < a[1]) return a; return null; };
+    const latoLuceAnelli = Math.sign(dot(s, polo)), latoVista = Math.sign(dot(V, polo));
+    const sfondo = [5, 10, 24];
+    for (let yy = 0; yy < N; yy++) {
+      for (let xx = 0; xx < N; xx++) {
+        const sx = (xx + 0.5 - N / 2) / pxR, sy = -(yy + 0.5 - N / 2) / pxR;
+        const o = add(add(mul(R, sx), mul(U, sy)), mul(V, 40));
+        let col = sfondo, k = (yy * N + xx) * 4;
+        // pianeta
+        const oS = sfera(o), b = 2 * dot(oS, dS), cc = dot(oS, oS) - 1, D = b * b - 4 * dS2 * cc;
+        let tP = Infinity, colP = null;
+        if (D >= 0) {
+          tP = (-b - Math.sqrt(D)) / (2 * dS2);
+          const q = add(o, mul(dir, tP));                         // punto sull'ellissoide
+          const qS = sfera(q), nrmv = unit(add(q, mul(polo, (1 / ((1 - fis.f) ** 2) - 1) * dot(q, polo))));
+          const lat = Math.asin(Math.max(-1, Math.min(1, dot(unit(qS), polo)))) / D2R;
+          const base = superficie(unit(qS), lat);
+          let luce = Math.max(0, dot(nrmv, s));
+          if (id === 'venus' && luce > 0) luce = 0.3 + 0.7 * Math.sqrt(luce);   // l'atmosfera rende brillante anche la falce sottile
+          if (anelli && luce > 0) { const tr = -dot(q, polo) / dot(s, polo); if (tr > 0) { const w = add(q, mul(s, tr)), a = anello(Math.hypot(...w)); if (a) luce *= 1 - a[2] * 0.85; } }
+          // ombre delle lune sul disco
+          for (const m of sc.lune) {
+            const rel = sub(q, m.pos), tt = -dot(rel, s); if (tt <= 0) continue;
+            const perp = add(rel, mul(s, tt)); if (Math.hypot(...perp) < m.r * 1.15) luce *= 0.08;
+          }
+          const mu = Math.max(0, dot(nrmv, V));
+          const bordo = (id === 'jupiter' || id === 'saturn' || id === 'uranus' || id === 'neptune') ? 0.55 + 0.45 * Math.sqrt(mu) : 1;
+          const amb = id === 'moon' ? 0.045 : 0.02;
+          const f = (amb + luce * 0.98) * bordo;
+          colP = [base[0] * f, base[1] * f, base[2] * f];
+          col = colP;
+        }
+        // anelli di Saturno
+        if (anelli) {
+          const dp = dot(dir, polo);
+          if (Math.abs(dp) > 1e-6) {
+            const tr = -dot(o, polo) / dp;
+            if (tr > 0) {
+              const w = add(o, mul(dir, tr)), rr = Math.hypot(...w), a = anello(rr);
+              if (a && tr < tP) {
+                let luce = latoLuceAnelli === latoVista ? 1 : 0.25;
+                if (colpisce(w, s) > 0) luce *= 0.06;            // ombra del pianeta sugli anelli
+                const sole = Math.abs(dot(s, polo));
+                luce *= 0.35 + 0.65 * Math.min(1, sole * 6 + 0.2);
+                const ac = [a[3][0] * luce, a[3][1] * luce, a[3][2] * luce], op = a[2];
+                col = [col[0] * (1 - op) + ac[0] * op, col[1] * (1 - op) + ac[1] * op, col[2] * (1 - op) + ac[2] * op];
+              }
+            }
+          }
+        }
+        px[k] = col[0]; px[k + 1] = col[1]; px[k + 2] = col[2]; px[k + 3] = 255;
+      }
+    }
+    c.putImageData(img, 0, 0);
+    // lune
+    c.font = Math.round(N / 42) + 'px system-ui'; c.textAlign = 'center';
+    const etichette = [];
+    sc.lune.forEach(m => {
+      const x = N / 2 + dot(m.pos, R) * pxR, y = N / 2 - dot(m.pos, U) * pxR;
+      const davanti = dot(m.pos, V);
+      const dentroDisco = Math.hypot(dot(m.pos, R), dot(m.pos, U)) < 1;
+      if (dentroDisco && davanti < 0) return;                     // nascosta dietro il pianeta
+      const inOmbra = colpisce(m.pos, s) > 0;
+      if (x < -20 || x > N + 20 || y < -20 || y > N + 20) return;
+      const rr = Math.max(N / 160, m.r * pxR);
+      c.beginPath(); c.arc(x, y, rr, 0, Math.PI * 2);
+      if (inOmbra) { c.strokeStyle = '#98A3C2'; c.lineWidth = 1; c.stroke(); } else { c.fillStyle = '#F1E9D2'; c.fill(); }
+      const testo = m.nome + (inOmbra ? ' (in ombra)' : ''), w = c.measureText(testo).width, hh = N / 40;
+      let ly = y - rr - N / 90;
+      if (etichette.some(e => Math.abs(e.x - x) < (e.w + w) / 2 && Math.abs(e.y - ly) < hh)) ly = y + rr + hh;
+      etichette.push({ x, y: ly, w });
+      c.fillStyle = '#98A3C2'; c.fillText(testo, x, ly);
+    });
+    // punti cardinali (solo nella vista dalla Terra)
+    if (!V3.yaw && !V3.pitch) {
+      c.fillStyle = 'rgba(205,168,95,.8)'; c.font = Math.round(N / 34) + 'px ' + SERIF();
+      c.fillText('N', N / 2, N / 26); c.fillText('S', N / 2, N - N / 60); c.textAlign = 'left'; c.fillText('E', N / 70, N / 2); c.textAlign = 'right'; c.fillText('O', N - N / 70, N / 2);
+    }
+    c.textAlign = 'start';
+    // informazioni
+    const diam = 2 * fis.R / sc.distKm / D2R * 3600;
+    const fase = (1 + dot(s, mul(sc.d, -1))) / 2;
+    const latTerra = Math.asin(dot(sc.V0, polo)) / D2R, latSole = Math.asin(dot(s, polo)) / D2R;
+    let info = '<b>' + sc.t.toLocaleString('it-CH', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) + '</b>' + (V3.minuti ? ' (' + (V3.minuti > 0 ? '+' : '') + V3.minuti / 60 + ' h)' : '') + '<br>';
+    info += 'Diametro apparente <b>' + (id === 'moon' ? (diam / 60).toFixed(1) + '′' : diam.toFixed(1) + '″') + '</b> · parte illuminata <b>' + Math.round(fase * 100) + '%</b><br>';
+    info += 'Polo nord ' + (latTerra >= 0 ? 'inclinato verso di noi' : 'inclinato lontano da noi') + ' di <b>' + Math.abs(latTerra).toFixed(1) + '°</b>';
+    if (id === 'saturn') info += ' · anelli aperti di <b>' + Math.abs(latTerra).toFixed(1) + '°</b>' + (Math.abs(latTerra) < 4 ? ' (quasi di taglio: appaiono come una linea sottile)' : '') + (Math.sign(latTerra) !== Math.sign(latSole) ? ' · vediamo la faccia in ombra degli anelli' : '');
+    info += '<br><span style="font-size:.82rem">Orientamento, fase, ombre e posizioni delle lune sono calcolati; i colori delle superfici sono stilizzati (bande per latitudine, calotte polari di Marte, mari lunari), non fotografie. Trascina per ruotare il pianeta.</span>';
+    $('v3dInfo').innerHTML = info;
+  }
+
+  function apriVista3D(id) {
+    V3.id = id; V3.yaw = 0; V3.pitch = 0; V3.minuti = 0; V3.lune = id === 'jupiter';
+    const b = Astro.BODIES.find(x => x.id === id);
+    $('v3dTitolo').textContent = b.name;
+    $('v3dLune').hidden = !(id === 'jupiter' || id === 'saturn');
+    $('v3dLune').textContent = V3.lune ? 'Solo il pianeta' : 'Con le lune';
+    $('v3d').classList.add('aperto');
+    requestAnimationFrame(() => disegnaV3(false));
+  }
+  $('v3dChiudi').onclick = () => { $('v3d').classList.remove('aperto'); V3.id = null; };
+  $('v3dTerra').onclick = () => { V3.yaw = 0; V3.pitch = 0; disegnaV3(false); };
+  $('v3dLune').onclick = () => { V3.lune = !V3.lune; $('v3dLune').textContent = V3.lune ? 'Solo il pianeta' : 'Con le lune'; disegnaV3(false); };
+  $('v3dOra').onclick = () => { V3.minuti -= 60; disegnaV3(false); };
+  $('v3dOraP').onclick = () => { V3.minuti += 60; disegnaV3(false); };
+  (() => {
+    const cv = $('v3dCanvas'); let attesa = null;
+    cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); V3.trascina = { x: e.clientX, y: e.clientY, yaw: V3.yaw, pitch: V3.pitch }; });
+    cv.addEventListener('pointermove', e => {
+      if (!V3.trascina) return;
+      const w = cv.clientWidth;
+      V3.yaw = V3.trascina.yaw - (e.clientX - V3.trascina.x) / w * Math.PI;
+      V3.pitch = Math.max(-1.5, Math.min(1.5, V3.trascina.pitch + (e.clientY - V3.trascina.y) / w * Math.PI));
+      if (!attesa) attesa = requestAnimationFrame(() => { attesa = null; disegnaV3(true); });
+    });
+    const fine = () => { if (V3.trascina) { V3.trascina = null; disegnaV3(false); } };
+    cv.addEventListener('pointerup', fine); cv.addEventListener('pointercancel', fine);
+  })();
 
   // ---------- Cielo stasera ----------
   $('tabPianeti').onclick = () => { $('vistaPianeti').hidden = false; $('vistaStasera').hidden = true; $('tabPianeti').classList.add('attivo'); $('tabStasera').classList.remove('attivo'); };
